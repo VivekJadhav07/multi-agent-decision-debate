@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multi-Agent Decision Debate</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --text: #eaeaea;
+    --muted: #9aa0aa;
+    --accent: #6c8dff;
+    --skeptic: #ff6b6b;
+    --optimist: #4dd08a;
+    --realist: #ffb84d;
+    --devil: #b46bff;
+    --judge: #4db8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .container { width: 100%; max-width: 720px; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  p.subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    background: var(--card);
+    border: 1px solid #2a2e37;
+    border-radius: 10px;
+    color: var(--text);
+    padding: 14px;
+    font-size: 1rem;
+    resize: vertical;
+  }
+  button {
+    margin-top: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .turn {
+    background: var(--card);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .turn .persona-name { font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .round-tag { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
+  .Skeptic { border-left-color: var(--skeptic); }
+  .Optimist { border-left-color: var(--optimist); }
+  .Realist { border-left-color: var(--realist); }
+  .Devil { border-left-color: var(--devil); }
+  .synthesis {
+    background: #12202e;
+    border: 1px solid var(--judge);
+    border-radius: 10px;
+    padding: 18px;
+    margin-top: 24px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+  .synthesis h3 { margin-top: 0; color: var(--judge); }
+  .status { color: var(--muted); margin-top: 16px; font-style: italic; }
+  .error { color: var(--skeptic); margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🗣️ Multi-Agent Decision Debate</h1>
+  <p class="subtitle">Type a decision you're unsure about. Four AI personas will debate it before you decide.</p>
+
+  <textarea id="decisionInput" placeholder="e.g. Should I take a startup job offer over a stable corporate one?"></textarea>
+  <br />
+  <button id="startBtn">Start Debate</button>
+
+  <div id="status"></div>
+  <div id="feed"></div>
+</div>
+
+<script>
+  const startBtn = document.getElementById('startBtn');
+  const input = document.getElementById('decisionInput');
+  const feed = document.getElementById('feed');
+  const status = document.getElementById('status');
+
+  function personaClass(name) {
+    if (name.includes('Skeptic')) return 'Skeptic';
+    if (name.includes('Optimist')) return 'Optimist';
+    if (name.includes('Realist')) return 'Realist';
+    if (name.includes('Devil')) return 'Devil';
+    return '';
+  }
+
+  startBtn.addEventListener('click', async () => {
+    const decision = input.value.trim();
+    feed.innerHTML = '';
+    status.innerHTML = '';
+
+    if (decision.length < 10) {
+      status.innerHTML = '<div class="error">Please enter a more detailed decision (at least 10 characters).</div>';
+      return;
+    }
+
+    startBtn.disabled = true;
+    status.innerHTML = '<div class="status">Personas are debating... this can take 15-30 seconds.</div>';
+
+    try {
+      const res = await fetch('/debate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, rounds: 2 })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        status.innerHTML = `<div class="error">Error: ${data.error || 'Unknown error'}</div>`;
+        startBtn.disabled = false;
+        return;
+      }
+
+      status.innerHTML = '';
+
+      data.transcript.forEach(turn => {
+        const div = document.createElement('div');
+        div.className = `turn ${personaClass(turn.persona)}`;
+        div.innerHTML = `
+          <div class="persona-name">
+            <span>${turn.persona}</span>
+            <span class="round-tag">Round ${turn.round}</span>
+          </div>
+          <div>${turn.text}</div>
+        `;
+        feed.appendChild(div);
+      });
+
+      const synthDiv = document.createElement('div');
+      synthDiv.className = 'synthesis';
+      synthDiv.innerHTML = `<h3>🧑‍⚖️ Synthesis</h3>${data.synthesis}`;
+      feed.appendChild(synthDiv);
+
+    } catch (err) {
+      status.innerHTML = `<div class="error">Request failed: ${err.message}</div>`;
+    } finally {
+      startBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
